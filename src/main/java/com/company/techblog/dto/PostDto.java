@@ -7,10 +7,12 @@ import lombok.Builder;
 import lombok.Getter;
 import com.company.techblog.domain.Post;
 import java.time.LocalDateTime;
+import lombok.Setter;
 
 public class PostDto {
 
     @Getter
+    @Setter
     public static class Request {
 
         @NotNull
