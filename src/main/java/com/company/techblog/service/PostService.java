@@ -2,6 +2,7 @@ package com.company.techblog.service;
 
 import com.company.techblog.domain.Post;
 import com.company.techblog.domain.User;
+import com.company.techblog.domain.UserStatus;
 import com.company.techblog.dto.PostDto;
 import com.company.techblog.dto.PostDto.Response;
 import com.company.techblog.repository.PostRepository;
@@ -24,6 +25,11 @@ public class PostService {
     public PostDto.Response createPost(PostDto.Request request) {
         User user = userRepository.findById(request.getUserId())
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // ADD THIS CODE
+        if (!UserStatus.ACTIVE.equals(user.getStatus())) {
+            throw new IllegalStateException("Inactive user cannot create posts");
+        }
 
         Post post = Post.builder()
             .author(user)
@@ -49,6 +55,14 @@ public class PostService {
 
     @Transactional
     public PostDto.Response updatePost(Long postId, PostDto.Request request) {
+        // // ADD THIS CODE
+        User user = userRepository.findById(request.getUserId())
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!UserStatus.ACTIVE.equals(user.getStatus())) {
+            throw new IllegalStateException("Inactive user cannot update posts");
+        }
+
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
