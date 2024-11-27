@@ -27,6 +27,9 @@ public class Post {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "like_count", nullable = false)
+    private Long likeCount = 0L;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
@@ -54,4 +57,13 @@ public class Post {
     public boolean isAuthorResigned() {
         return this.author.isResigned();
     }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        this.likeCount = Math.max(0, this.likeCount - 1);
+    }
+
 }

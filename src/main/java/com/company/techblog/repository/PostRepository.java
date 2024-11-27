@@ -12,4 +12,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     @Query("SELECT p FROM Post p JOIN FETCH p.author ORDER BY p.createdAt DESC")
     List<Post> findAll();
+
+    List<Post> findTop10ByOrderByLikeCountDescCreatedAtDesc();
 }

@@ -1,13 +1,17 @@
 package com.company.techblog.service;
 
 import com.company.techblog.domain.Post;
+import com.company.techblog.domain.PostLike;
 import com.company.techblog.domain.User;
 import com.company.techblog.domain.UserStatus;
+import com.company.techblog.dto.LikeResponse;
 import com.company.techblog.dto.PostDto;
 import com.company.techblog.dto.PostDto.Response;
+import com.company.techblog.repository.LikeRepository;
 import com.company.techblog.repository.PostRepository;
 import com.company.techblog.repository.UserRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,7 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final LikeRepository likeRepository;
 
     @Transactional
     public PostDto.Response createPost(PostDto.Request request) {
@@ -49,6 +54,12 @@ public class PostService {
 
     public List<Response> getAllPosts() {
         return postRepository.findAll().stream()
+            .map(PostDto.Response::from)
+            .collect(Collectors.toList());
+    }
+
+    public List<Response> getPopularPosts() {
+        return postRepository.findTop10ByOrderByLikeCountDescCreatedAtDesc().stream()
             .map(PostDto.Response::from)
             .collect(Collectors.toList());
     }
@@ -85,4 +96,42 @@ public class PostService {
 
         postRepository.delete(post);
     }
+
+    @Transactional
+    public LikeResponse toggleLike(Long postId, Long userId) {
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (post.isAuthor(userId)) {
+            throw new IllegalStateException("Cannot like your own post");
+        }
+
+        Optional<PostLike> existingLike = likeRepository.findByPostIdAndUserId(postId, userId);
+
+        boolean liked;
+        if (existingLike.isPresent()) {
+            likeRepository.delete(existingLike.get());
+            post.decreaseLikeCount();
+            liked = false;
+        } else {
+            PostLike postLike = PostLike.builder()
+                .post(post)
+                .user(user)
+                .build();
+            likeRepository.save(postLike);
+            post.increaseLikeCount();
+            liked = true;
+        }
+
+        return LikeResponse.builder()
+            .postId(postId)
+            .likeCount(post.getLikeCount())
+            .liked(liked)
+            .build();
+    }
+
+
 }
