@@ -5,8 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.*;
 
 import com.company.techblog.domain.Post;
+import com.company.techblog.domain.PostLike;
 import com.company.techblog.domain.User;
+import com.company.techblog.dto.LikeResponse;
 import com.company.techblog.dto.PostDto;
+import com.company.techblog.repository.LikeRepository;
 import com.company.techblog.repository.PostRepository;
 import com.company.techblog.repository.UserRepository;
 import com.company.techblog.service.PostService;
@@ -29,6 +32,9 @@ class PostServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private LikeRepository likeRepository;
 
     @DisplayName("활성 사용자는 게시글을 작성할 수 있다")
     @Test
@@ -91,5 +97,107 @@ class PostServiceTest {
 
         verify(userRepository).findById(userId);
         verify(postRepository, never()).save(any(Post.class));
+    }
+
+    @DisplayName("게시글 좋아요 토글 - 좋아요 추가")
+    @Test
+    void toggleLike_WhenNotLiked_ShouldAddLike() {
+        // given
+        Long postId = 1L;
+        Long userId = 2L;
+        User user = User.builder().build();
+        TestHelper.setId(user, userId);
+
+        User author = User.builder().build();
+        TestHelper.setId(author, 3L);
+
+        Post post = Post.builder()
+            .author(author)
+            .title("Test Post")
+            .content("Test Content")
+            .build();
+        TestHelper.setId(post, postId);
+
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(likeRepository.findByPostIdAndUserId(postId, userId))
+            .willReturn(Optional.empty());
+
+        // when
+        LikeResponse response = postService.toggleLike(postId, userId);
+
+        // then
+        assertThat(response.getPostId()).isEqualTo(postId);
+        assertThat(response.isLiked()).isTrue();
+        assertThat(response.getLikeCount()).isEqualTo(1L);
+
+        verify(likeRepository).save(any(PostLike.class));
+    }
+
+    @DisplayName("게시글 좋아요 토글 - 좋아요 취소")
+    @Test
+    void toggleLike_WhenAlreadyLiked_ShouldRemoveLike() {
+        // given
+        Long postId = 1L;
+        Long userId = 2L;
+        User user = User.builder().build();
+        TestHelper.setId(user, userId);
+
+        User author = User.builder().build();
+        TestHelper.setId(author, 3L);
+
+        Post post = Post.builder()
+            .author(author)
+            .title("Test Post")
+            .content("Test Content")
+            .build();
+        TestHelper.setId(post, postId);
+
+        post.increaseLikeCount();
+
+        PostLike existingLike = PostLike.builder()
+            .post(post)
+            .user(user)
+            .build();
+
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(likeRepository.findByPostIdAndUserId(postId, userId))
+            .willReturn(Optional.of(existingLike));
+
+        // when
+        LikeResponse response = postService.toggleLike(postId, userId);
+
+        // then
+        assertThat(response.getPostId()).isEqualTo(postId);
+        assertThat(response.isLiked()).isFalse();
+        assertThat(response.getLikeCount()).isEqualTo(0L);
+
+        verify(likeRepository).delete(existingLike);
+    }
+
+    @DisplayName("본인 게시글 좋아요 시도 시 예외 발생")
+    @Test
+    void toggleLike_WhenLikingOwnPost_ShouldThrowException() {
+        // given
+        Long userId = 1L;
+        User user = User.builder().build();
+        TestHelper.setId(user, userId);
+
+        Post post = Post.builder()
+            .author(user)
+            .title("Test Post")
+            .content("Test Content")
+            .build();
+        given(postRepository.findById(1L)).willReturn(Optional.of(post));
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        // when & then
+        assertThatThrownBy(() -> postService.toggleLike(1L, userId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Cannot like your own post");
+
+        verify(likeRepository, never()).save(any());
+        verify(likeRepository, never()).delete(any());
     }
 }
